@@ -1,0 +1,151 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  name          String
+  email         String   @unique
+  password_hash String
+  role          String   @default("USER")
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+}
+
+model WhatsappInstance {
+  id                Int      @id @default(autoincrement())
+  name              String
+  phone             String?
+  instance_name     String   @unique
+  api_url           String?
+  status            String   @default("DISCONNECTED")
+  last_connected_at DateTime?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  conversations    Conversation[]
+  messages         Message[]
+  scheduled        ScheduledMessage[]
+  webhook_events   WebhookEvent[]
+}
+
+model Contact {
+  id          Int      @id @default(autoincrement())
+  name        String
+  phone       String
+  whatsapp_id String?  @unique
+  email       String?
+  avatar      String?
+  notes       String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  conversations    Conversation[]
+  messages         Message[]
+  scheduled        ScheduledMessage[]
+  contact_tags     ContactTag[]
+}
+
+model Conversation {
+  id              Int      @id @default(autoincrement())
+  instance_id     Int
+  contact_id      Int
+  last_message    String?
+  last_message_at DateTime?
+  unread_count    Int      @default(0)
+  status          String   @default("OPEN")
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  instance WhatsappInstance @relation(fields: [instance_id], references: [id])
+  contact  Contact          @relation(fields: [contact_id], references: [id])
+  messages Message[]
+
+  @@unique([instance_id, contact_id])
+}
+
+model Message {
+  id              Int      @id @default(autoincrement())
+  instance_id     Int
+  conversation_id Int
+  contact_id      Int
+  message_id      String   @unique
+  direction       String   // "INCOMING" or "OUTGOING"
+  type            String   // "text", "image", "video", etc.
+  body            String?
+  media_url       String?
+  status          String   // "SENT", "DELIVERED", "READ", etc.
+  timestamp       DateTime
+  created_at      DateTime @default(now())
+
+  instance     WhatsappInstance @relation(fields: [instance_id], references: [id])
+  conversation Conversation     @relation(fields: [conversation_id], references: [id])
+  contact      Contact          @relation(fields: [contact_id], references: [id])
+}
+
+model MessageTemplate {
+  id         Int      @id @default(autoincrement())
+  name       String
+  title      String?
+  body       String
+  category   String?
+  active     Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  
+  scheduled_messages ScheduledMessage[]
+}
+
+model ScheduledMessage {
+  id            Int      @id @default(autoincrement())
+  instance_id   Int
+  contact_id    Int
+  template_id   Int?
+  message       String
+  scheduled_at  DateTime
+  status        String   @default("PENDING") // PENDING, SENT, FAILED, CANCELLED
+  attempts      Int      @default(0)
+  error_message String?
+  sent_at       DateTime?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  instance WhatsappInstance @relation(fields: [instance_id], references: [id])
+  contact  Contact          @relation(fields: [contact_id], references: [id])
+  template MessageTemplate? @relation(fields: [template_id], references: [id])
+}
+
+model Tag {
+  id         Int      @id @default(autoincrement())
+  name       String   @unique
+  color      String?
+  created_at DateTime @default(now())
+
+  contact_tags ContactTag[]
+}
+
+model ContactTag {
+  id         Int @id @default(autoincrement())
+  contact_id Int
+  tag_id     Int
+
+  contact Contact @relation(fields: [contact_id], references: [id])
+  tag     Tag     @relation(fields: [tag_id], references: [id])
+
+  @@unique([contact_id, tag_id])
+}
+
+model WebhookEvent {
+  id          Int      @id @default(autoincrement())
+  instance_id Int?
+  event       String
+  payload     String
+  processed   Boolean  @default(false)
+  created_at  DateTime @default(now())
+
+  instance WhatsappInstance? @relation(fields: [instance_id], references: [id])
+}

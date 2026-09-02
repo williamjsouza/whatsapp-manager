@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  whatsapp-manager:
+    build: .
+    container_name: whatsapp_manager
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend/database:/app/backend/database
+      - ./logs:/app/logs
+      - ./backups:/app/backups
+      - ./.env:/app/.env
+    environment:
+      - NODE_ENV=production
+    restart: always

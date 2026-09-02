@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Manager - Dashboard</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .topbar h1 { margin: 0; color: #128c7e; font-size: 24px; }
+    .auth-info { display: flex; align-items: center; gap: 15px; }
+    .btn { background: #128c7e; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; text-decoration: none; }
+    .btn:hover { background: #0b7366; }
+    .btn-secondary { background: #25d366; }
+    
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 20px; }
+    .stat-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; }
+    .stat-card h3 { margin: 0; font-size: 16px; color: #555; }
+    .stat-card .value { font-size: 32px; font-weight: bold; color: #128c7e; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  
+  <div class="topbar">
+    <h1>WhatsApp Manager</h1>
+    <div class="auth-info" id="auth-info">
+      <!-- Auth info populated here -->
+    </div>
+  </div>
+
+  <div class="stats-grid" id="stats-grid" style="display: none;">
+    <div class="stat-card"><h3>Instâncias</h3><div class="value" id="stat-instances">-</div></div>
+    <div class="stat-card"><h3>Contatos</h3><div class="value" id="stat-contacts">-</div></div>
+    <div class="stat-card"><h3>Conversas Abertas</h3><div class="value" id="stat-open">-</div></div>
+    <div class="stat-card"><h3>Enviadas</h3><div class="value" id="stat-sent">-</div></div>
+    <div class="stat-card"><h3>Recebidas</h3><div class="value" id="stat-received">-</div></div>
+    <div class="stat-card"><h3>Agendamentos (Pendentes)</h3><div class="value" id="stat-scheduled">-</div></div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    if (!api.getToken()) {
+      window.location.href = '/login.html';
+    } else {
+      // Validate token and load user
+      api.request('/auth/me').then(data => {
+        if (data && data.success) {
+          const user = data.data.user;
+          const authDiv = document.getElementById('auth-info');
+          authDiv.innerHTML = `
+            <span><strong>${user.name}</strong> (${user.role})</span>
+            <a href="/instances.html" class="btn">Instâncias</a>
+            <a href="/chat.html" class="btn btn-secondary">Chat Web</a>
+            <button class="btn" style="background:#555;" onclick="api.logout()">Sair</button>
+          `;
+          
+          loadDashboardStats();
+        }
+      });
+      
+      const socket = io();
+      socket.on('connect', () => {
+        console.log('WS Connectado');
+      });
+      // Listen for events to update dashboard in real time
+      socket.on('message:new', loadDashboardStats);
+      socket.on('message:sent', loadDashboardStats);
+      socket.on('instance:status', loadDashboardStats);
+      socket.on('conversation:update', loadDashboardStats);
+    }
+
+    async function loadDashboardStats() {
+      try {
+        const res = await api.request('/dashboard/stats');
+        if (res && res.success) {
+          const stats = res.data;
+          document.getElementById('stats-grid').style.display = 'grid';
+          document.getElementById('stat-instances').textContent = stats.totalInstances;
+          document.getElementById('stat-contacts').textContent = stats.totalContacts;
+          document.getElementById('stat-open').textContent = stats.openConversations + ' / ' + stats.totalConversations;
+          document.getElementById('stat-sent').textContent = stats.messagesSent;
+          document.getElementById('stat-received').textContent = stats.messagesReceived;
+          document.getElementById('stat-scheduled').textContent = stats.upcomingScheduled;
+        }
+      } catch(e) {
+        console.error("Failed to load stats", e);
+      }
+    }
+  </script>
+</body>
+</html>

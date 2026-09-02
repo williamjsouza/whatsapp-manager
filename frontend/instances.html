@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Manager - Instâncias</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
+    .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    h1 { color: #128c7e; margin: 0; }
+    .btn { background: #128c7e; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; text-decoration: none; }
+    .btn:hover { background: #0b7366; }
+    .btn-danger { background: #d32f2f; }
+    .btn-danger:hover { background: #b71c1c; }
+    table { width: 100%; background: white; border-collapse: collapse; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    th, td { padding: 15px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background: #f9f9f9; }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
+    .modal-content { background: white; padding: 20px; border-radius: 8px; width: 400px; text-align: center; }
+    .input-group { margin-bottom: 15px; text-align: left; }
+    .input-group label { display: block; margin-bottom: 5px; }
+    .input-group input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    .qr-code-img { max-width: 100%; margin-top: 15px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Instâncias do WhatsApp</h1>
+    <div>
+      <a href="/index.html" class="btn" style="background: #555;">Voltar</a>
+      <button class="btn" onclick="openCreateModal()">+ Nova Instância</button>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Nome da Instância (API)</th>
+        <th>Status</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody id="instances-body">
+      <tr><td colspan="4" style="text-align: center;">Carregando...</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Modal Nova Instância -->
+  <div class="modal" id="createModal">
+    <div class="modal-content">
+      <h2 style="margin-top: 0;">Nova Instância</h2>
+      <div id="create-error" style="color: red; margin-bottom: 10px; display: none;"></div>
+      
+      <div id="create-form-div">
+        <div class="input-group">
+          <label>Nome (Ex: Atendimento)</label>
+          <input type="text" id="inst-name" required>
+        </div>
+        <div class="input-group">
+          <label>ID da Instância (Ex: atend-01 - sem espaços)</label>
+          <input type="text" id="inst-id" required>
+        </div>
+        <button class="btn" onclick="createInstance()">Criar</button>
+        <button class="btn btn-danger" onclick="closeModal()">Cancelar</button>
+      </div>
+
+      <div id="qr-code-div" style="display: none;">
+        <h3>Escaneie o QR Code no WhatsApp</h3>
+        <img id="qr-code-img" class="qr-code-img" src="" alt="QR Code">
+        <br><br>
+        <button class="btn" onclick="closeModal(); loadInstances();">Concluir</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    if (!api.getToken()) window.location.href = '/login.html';
+
+    async function loadInstances() {
+      const tbody = document.getElementById('instances-body');
+      try {
+        const response = await api.request('/instances');
+        if (response && response.success) {
+          const instances = response.data;
+          tbody.innerHTML = '';
+          if (instances.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Nenhuma instância encontrada.</td></tr>';
+            return;
+          }
+          instances.forEach(inst => {
+            tbody.innerHTML += `
+              <tr>
+                <td>${inst.name}</td>
+                <td>${inst.instance_name}</td>
+                <td><strong>${inst.status}</strong></td>
+                <td>
+                  <button class="btn" onclick="connectInstance(${inst.id})">Conectar</button>
+                  <button class="btn btn-danger" onclick="deleteInstance(${inst.id})">Excluir</button>
+                </td>
+              </tr>
+            `;
+          });
+        }
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: red;">Erro ao carregar instâncias.</td></tr>';
+      }
+    }
+
+    function openCreateModal() {
+      document.getElementById('createModal').style.display = 'flex';
+      document.getElementById('create-form-div').style.display = 'block';
+      document.getElementById('qr-code-div').style.display = 'none';
+      document.getElementById('create-error').style.display = 'none';
+      document.getElementById('inst-name').value = '';
+      document.getElementById('inst-id').value = '';
+    }
+
+    function closeModal() {
+      document.getElementById('createModal').style.display = 'none';
+    }
+
+    async function createInstance() {
+      const name = document.getElementById('inst-name').value;
+      const instance_name = document.getElementById('inst-id').value;
+      const errorDiv = document.getElementById('create-error');
+
+      if (!name || !instance_name) {
+        errorDiv.textContent = 'Preencha todos os campos.';
+        errorDiv.style.display = 'block';
+        return;
+      }
+
+      errorDiv.style.display = 'none';
+      try {
+        const res = await api.request('/instances', {
+          method: 'POST',
+          body: JSON.stringify({ name, instance_name })
+        });
+
+        if (res.success) {
+          document.getElementById('create-form-div').style.display = 'none';
+          document.getElementById('qr-code-div').style.display = 'block';
+          if (res.data.qrCode) {
+            document.getElementById('qr-code-img').src = res.data.qrCode;
+          } else {
+            document.getElementById('qr-code-div').innerHTML = '<p>Instância criada. Atualize para conectar.</p><button class="btn" onclick="closeModal(); loadInstances();">Ok</button>';
+          }
+        } else {
+          errorDiv.textContent = res.error.message;
+          errorDiv.style.display = 'block';
+        }
+      } catch (err) {
+        errorDiv.textContent = 'Erro de servidor.';
+        errorDiv.style.display = 'block';
+      }
+    }
+
+    async function connectInstance(id) {
+      try {
+        const res = await api.request(`/instances/${id}/connect`, { method: 'POST' });
+        if (res.success && res.data) {
+          if (res.data.base64) {
+             document.getElementById('createModal').style.display = 'flex';
+             document.getElementById('create-form-div').style.display = 'none';
+             document.getElementById('qr-code-div').style.display = 'block';
+             document.getElementById('qr-code-img').src = res.data.base64;
+          } else {
+             alert('Instância já está conectada!');
+             loadInstances();
+          }
+        }
+      } catch(e) {
+        alert('Erro ao tentar conectar com a Evolution API.');
+      }
+    }
+
+    async function deleteInstance(id) {
+      if(confirm('Tem certeza que deseja excluir esta instância?')) {
+        await api.request(`/instances/${id}`, { method: 'DELETE' });
+        loadInstances();
+      }
+    }
+
+    window.onload = loadInstances;
+  </script>
+</body>
+</html>

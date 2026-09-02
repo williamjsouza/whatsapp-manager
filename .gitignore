@@ -1,0 +1,14 @@
+node_modules
+.env
+/generated/prisma
+backend/database/database.sqlite
+backend/database/database.sqlite-journal
+logs/
+backups/
+uploads/
+set_webhook.js
+.agents/
+.claude/
+.windsurf/
+skills-lock.json
+prisma7.config.ts
