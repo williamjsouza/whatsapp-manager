@@ -35,7 +35,7 @@ RUN echo '#!/bin/sh' > /app/entrypoint.sh && \
     echo 'set -e' >> /app/entrypoint.sh && \
     echo 'export DATABASE_URL="file:./backend/database/database.sqlite"' >> /app/entrypoint.sh && \
     echo 'echo "Running database migration..."' >> /app/entrypoint.sh && \
-    echo 'npx prisma db push --accept-data-loss 2>/dev/null || echo "Migration skipped"' >> /app/entrypoint.sh && \
+    echo 'npx prisma db push --config=prisma.config.js --accept-data-loss 2>/dev/null || echo "Migration skipped"' >> /app/entrypoint.sh && \
     echo 'echo "Running seed..."' >> /app/entrypoint.sh && \
     echo 'node prisma/seed.js' >> /app/entrypoint.sh && \
     echo 'echo "Starting application..."' >> /app/entrypoint.sh && \
